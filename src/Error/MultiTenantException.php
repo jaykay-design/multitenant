@@ -14,7 +14,7 @@
  */
 namespace MultiTenant\Error;
 
-use Cake\Core\Exception\Exception;
+use Exception;
 
 /**
  * Parent class for all of the HTTP related exceptions in CakePHP.
@@ -22,5 +22,6 @@ use Cake\Core\Exception\Exception;
  * catch blocks can be specifically typed.
  *
  */
-class MultiTenantException extends Exception {
+class MultiTenantException extends Exception
+{
 }

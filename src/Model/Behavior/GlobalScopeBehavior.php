@@ -14,23 +14,19 @@
  */
 namespace MultiTenant\Model\Behavior;
 
+use ArrayObject;
+use Cake\Datasource\EntityInterface;
 use Cake\Event\Event;
-use Cake\ORM\Association;
+use Cake\Event\EventInterface;
 use Cake\ORM\Behavior;
 use Cake\ORM\Entity;
-use Cake\ORM\Table;
 use Cake\ORM\Query;
+use Cake\ORM\Table;
 use MultiTenant\Core\MTApp;
+use MultiTenant\Error\DataScopeViolationException;
 
-class GlobalScopeBehavior extends Behavior {
-	
-/**
- * Keeping a reference to the table in order to,
- * be able to retrieve table/model attributes
- *
- * @var \Cake\ORM\Table
- */
-	protected $_table;
+class GlobalScopeBehavior extends Behavior
+{
 
 /**
  * Default config
@@ -40,10 +36,10 @@ class GlobalScopeBehavior extends Behavior {
  *
  * @var array
  */
-	protected $_defaultConfig = [
-		'implementedFinders' => [],
-		'implementedMethods' => []
-	];
+    protected $_defaultConfig = [
+        'implementedFinders' => [],
+        'implementedMethods' => [],
+    ];
 
 /**
  * Constructor
@@ -54,26 +50,27 @@ class GlobalScopeBehavior extends Behavior {
  * @param \Cake\ORM\Table $table The table this behavior is attached to.
  * @param array $config The config for this behavior.
  */
-	public function __construct(Table $table, array $config = []) {
-		//Merge $config with application-wide scopeBehavior config
-		$config = array_merge( MTApp::config( 'scopeBehavior' ), $config );
-		parent::__construct($table, $config);
+    public function __construct(Table $table, array $config = [])
+    {
+        $config = array_merge(MTApp::getConfig('scopeBehavior'), $config);
+        parent::__construct($table, $config);
+    }
 
-		$this->_table = $table;
-
-	}
-
-/**
- * beforeFind callback
- *
- * @param \Cake\Event\Event $event The beforeFind event that was fired.
- * @param \Cake\ORM\Query $query The query.
- * @return void
- */
-	public function beforeFind( Event $event, Query $query ) {
-
-		return $query;
-	}
+    /**
+     * beforeFind callback
+     *
+     * inject where condition if context is 'tenant'
+     *
+     * @param \Cake\Event\Event $event The beforeFind event that was fired.
+     * @param \Cake\ORM\Query $query The query.
+     * @return void
+     */
+    public function beforeFind(EventInterface $event, Query $query, ArrayObject $options, bool $primary)
+    {
+        if (MTApp::getContext() === 'tenant') {
+            throw new DataScopeViolationException('Tenant cannot query global records');
+        }
+    }
 
 /**
  * beforeSave callback
@@ -84,15 +81,13 @@ class GlobalScopeBehavior extends Behavior {
  * @param \Cake\ORM\Entity $entity The entity that was saved.
  * @return void
  */
-	public function beforeSave( Event $event, Entity $entity, $options ) {
-		//Prevent saving records in the implementing table if this is the tenant context
-		if ( MTApp::getContext() == 'tenant' ) {
-			return false;
-		}
-
-		return true;
-	}
-
+    public function beforeSave(EventInterface $event, EntityInterface $entity, ArrayObject $options)
+    {
+        //Prevent saving records in the implementing table if this is the tenant context
+        if (MTApp::getContext() === 'tenant') {
+            throw new DataScopeViolationException('Tenant cannot save global records');
+        }
+    }
 
 /**
  * beforeDelete callback
@@ -103,13 +98,10 @@ class GlobalScopeBehavior extends Behavior {
  * @param \Cake\ORM\Entity $entity The entity that was saved.
  * @return void
  */
-	public function beforeDelete( Event $event, Entity $entity, $options ) {
-
-		if ( MTApp::getContext() == 'tenant' ) { 
-			return false;
-		}
-
-		return true;
-	}
-
+    public function beforeDelete(EventInterface $event, EntityInterface $entity, ArrayObject $options)
+    {
+        if (MTApp::getContext() == 'tenant') {
+            throw new DataScopeViolationException('Tenant cannot delete global records');
+        }
+    }
 }

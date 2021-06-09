@@ -13,7 +13,3 @@
  * @license       http://www.opensource.org/licenses/mit-license.php MIT License
  */
 namespace MultiTenant\Config;
-
-use MultiTenant\Core\MTApp;
-use Cake\Configure\Engine\PhpConfig;
-use Cake\Core\Configure;

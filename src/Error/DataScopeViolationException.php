@@ -14,7 +14,8 @@
  */
 namespace MultiTenant\Error;
 
-class DataScopeViolationException extends MultiTenantException {
+class DataScopeViolationException extends MultiTenantException
+{
 
 /**
  * Constructor
@@ -22,11 +23,12 @@ class DataScopeViolationException extends MultiTenantException {
  * @param string $message If no message is given 'DataScopeViolation' will be the message
  * @param int $code Status code, defaults to 400
  */
-	public function __construct($message = null, $code=null) {
-		if (empty($message)) {
-			$message = 'DataScopeViolation';
-		}
-		parent::__construct($message, $code);
-	}
+    public function __construct($message = null, $code = null)
+    {
+        if (empty($message)) {
+            $message = 'DataScopeViolation';
+        }
+        parent::__construct($message, $code);
+    }
 
 }

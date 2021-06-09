@@ -15,23 +15,13 @@
 namespace MultiTenant\Model\Behavior;
 
 use Cake\Event\Event;
-use Cake\ORM\Association;
 use Cake\ORM\Behavior;
 use Cake\ORM\Entity;
 use Cake\ORM\Table;
-use Cake\ORM\Query;
 use MultiTenant\Core\MTApp;
-use MultiTenant\Error\DataScopeViolationException;
 
-class NoScopeBehavior extends Behavior {
-	
-/**
- * Keeping a reference to the table in order to,
- * be able to retrieve table/model attributes
- *
- * @var \Cake\ORM\Table
- */
-	protected $_table;
+class NoScopeBehavior extends Behavior
+{
 
 /**
  * Default config
@@ -41,11 +31,11 @@ class NoScopeBehavior extends Behavior {
  *
  * @var array
  */
-	protected $_defaultConfig = [
-		'implementedFinders' => [],
-		'implementedMethods' => [],
-		'foreign_key_field'=>'account_id'
-	];
+    protected $_defaultConfig = [
+        'implementedFinders' => [],
+        'implementedMethods' => [],
+        'foreign_key_field' => 'account_id',
+    ];
 
 /**
  * Constructor
@@ -54,15 +44,11 @@ class NoScopeBehavior extends Behavior {
  * @param \Cake\ORM\Table $table The table this behavior is attached to.
  * @param array $config The config for this behavior.
  */
-	public function __construct(Table $table, array $config = []) {
-
-		//Merge $config with application-wide scopeBehavior config
-		$config = array_merge( MTApp::config( 'scopeBehavior' ), $config );
-		parent::__construct($table, $config);
-
-		$this->_table = $table;
-
-	}
+    public function __construct(Table $table, array $config = [])
+    {
+        $config = array_merge(MTApp::getConfig('scopeBehavior'), $config);
+        parent::__construct($table, $config);
+    }
 
 /**
  * beforeSave callback
@@ -73,29 +59,15 @@ class NoScopeBehavior extends Behavior {
  * @param \Cake\ORM\Entity $entity The entity that was saved.
  * @return void
  */
-	public function beforeSave( Event $event, Entity $entity, $options ) {
+    public function beforeSave(Event $event, Entity $entity, $options)
+    {
+        if (MTApp::getContext() !== 'tenant') {
+            return;
+        }
 
-		if ( MTApp::getContext() == 'tenant' ) { //save new operation
-
-			$field = $this->config('foreign_key_field');
-			if ( $entity->isNew() ) {
-
-				// Model is no required to have a foreign_key_field to tenant,
-				// But if one exists we will update it
-
-				// no overwrite, if foreign_keyfield has an assigned value, do nothing
-				if ( $entity->{$field} === null ) {
-
-					$entity->{$field} = MTApp::tenant()->id;
-				}
-
-			}
-
-		}
-
-		return true;
-	}
-
-
-
+        $field = $this->getConfig('foreign_key_field');
+        if ($entity->isNew() && $entity->has($field) && $entity->get($field) === null) {
+            $entity->set($field, MTApp::tenant()->id);
+        }
+    }
 }

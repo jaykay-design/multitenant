@@ -14,25 +14,17 @@
  */
 namespace MultiTenant\Model\Behavior;
 
-use Cake\Event\Event;
-use Cake\ORM\Association;
+use ArrayObject;
+use Cake\Datasource\EntityInterface;
+use Cake\Event\EventInterface;
 use Cake\ORM\Behavior;
-use Cake\ORM\Entity;
-use Cake\ORM\Table;
 use Cake\ORM\Query;
+use Cake\ORM\Table;
 use MultiTenant\Core\MTApp;
 use MultiTenant\Error\DataScopeViolationException;
-use MultiTenant\Error\MultiTenantException;
 
-class TenantScopeBehavior extends Behavior {
-	
-/**
- * Keeping a reference to the table in order to,
- * be able to retrieve table/model attributes
- *
- * @var \Cake\ORM\Table
- */
-	protected $_table;
+class TenantScopeBehavior extends Behavior
+{
 
 /**
  * Default config
@@ -42,11 +34,11 @@ class TenantScopeBehavior extends Behavior {
  *
  * @var array
  */
-	protected $_defaultConfig = [
-		'implementedFinders' => [],
-		'implementedMethods' => [],
-		'foreign_key_field'=>'account_id'
-	];
+    protected $_defaultConfig = [
+        'implementedFinders' => [],
+        'implementedMethods' => [],
+        'foreign_key_field' => 'account_id',
+    ];
 
 /**
  * Constructor
@@ -55,15 +47,11 @@ class TenantScopeBehavior extends Behavior {
  * @param \Cake\ORM\Table $table The table this behavior is attached to.
  * @param array $config The config for this behavior.
  */
-	public function __construct(Table $table, array $config = []) {
-
-		//Merge $config with application-wide scopeBehavior config
-		$config = array_merge( MTApp::config( 'scopeBehavior' ), $config );
-		parent::__construct($table, $config);
-
-		$this->_table = $table;
-
-	}
+    public function __construct(Table $table, array $config = [])
+    {
+        $config = array_merge(MTApp::getConfig('scopeBehavior'), $config);
+        parent::__construct($table, $config);
+    }
 
 /**
  * beforeFind callback
@@ -74,35 +62,27 @@ class TenantScopeBehavior extends Behavior {
  * @param \Cake\ORM\Query $query The query.
  * @return void
  */
-	public function beforeFind( Event $event, Query $query, $options) {
+    public function beforeFind(EventInterface $event, Query $query, ArrayObject $options, bool $primary)
+    {
+        // if context is tenant, add conditions to query
+        if (MTApp::getContext() !== 'tenant') {
+            // tenant scope does not allow global context
+            throw new DataScopeViolationException('Tenant Scoped accessed globally');
+        }
 
+        // check if find option has "skipTenant", recursive error fix
+        if (isset($options['skipTenantCheck']) && $options['skipTenantCheck'] === true) {
+            return;
+        }
 
-		// if context is tenant, add conditions to query
-		if ( MTApp::getContext() == 'tenant') {
-
-			// check if find option has "skipTenant", recursive error fix
-			if (!isset($options['skipTenantCheck']) || $options['skipTenantCheck'] !== true) {
-
-				// secure the configured tenant table by adding a primary key condition
-				if ($this->_table->alias() === MTApp::config('model')['className']) {
-					$query->where([$this->_table->alias().'.'.$this->_table->primaryKey()=>MTApp::tenant()->id]);
-				} else {
-					$query->where([$this->_table->alias().'.'.$this->config('foreign_key_field')=>MTApp::tenant()->id]);
-				}
-			}
-		}
-
-		//skip if primary domain 
-		else if(MTApp::isPrimary()){
-			return true;
-		}
-
-		// tenant scope does not allow global context
-		else {
-			throw new DataScopeViolationException('Tenant Scoped accessed globally');
-		}
-		return $query;
-	}
+        $alias = $this->_table->getAlias();
+        // secure the configured tenant table by adding a primary key condition
+        if ($alias === MTApp::getConfig('model')['className']) {
+            $query->where([$alias . '.' . $this->_table->getPrimaryKey() => MTApp::tenant()->id]);
+        } else {
+            $query->where([$alias . '.' . $this->getConfig('foreign_key_field') => MTApp::tenant()->id]);
+        }
+    }
 
 /**
  * beforeSave callback
@@ -113,39 +93,26 @@ class TenantScopeBehavior extends Behavior {
  * @param \Cake\ORM\Entity $entity The entity that was saved.
  * @return void
  */
-	public function beforeSave( Event $event, Entity $entity, $options ) {
+    public function beforeSave(EventInterface $event, EntityInterface $entity, ArrayObject $options)
+    {
+        if (MTApp::getContext() !== 'tenant') {
+            // tenant scope does not allow global context
+            throw new DataScopeViolationException('Tenant Scoped accessed globally');
+        }
 
-		if ( MTApp::getContext() == 'tenant' ) { //save new operation
+        $field = $this->getConfig('foreign_key_field');
+        if ($entity->isNew()) {
+            //blind overwrite, preventing user from providing explicit value
+            $entity->set($field, MTApp::tenant()->id);
+        } else {
+            //paranoid check of ownership
+            if ($entity->get($field) != MTApp::tenant()->id) {
+                //current tenant is NOT owner
+                throw new DataScopeViolationException('Tenant->id: ' . MTApp::tenant()->id . ' does not own ' . $this->_table->getAlias() . '->id: ' . $entity->id);
+            }
+        }
 
-			$field = $this->config('foreign_key_field');
-			if ( $entity->isNew()) {
-				
-				//blind overwrite, preventing user from providing explicit value
-				$entity->{$field} = MTApp::tenant()->id;
-
-			} else { //update operation
-
-				//paranoid check of ownership
-				if ( $entity->{$field} != MTApp::tenant()->id ) { //current tenant is NOT owner
-					throw new DataScopeViolationException('Tenant->id: ' . MTApp::tenant()->id . ' does not own '.$this->_table->alias().'->id: ' . $entity->id );
-				}
-				
-			} // end if
-
-		} 
-
-		//skip if primary domain
-		else if(MTApp::isPrimary()){
-			return true;
-		}
-
-		// tenant scope does not allow global context
-		else {
-			throw new DataScopeViolationException('Tenant Scoped accessed globally');
-		}
-
-		return true;
-	}
+    }
 
 /**
  * beforeDelete callback
@@ -156,31 +123,19 @@ class TenantScopeBehavior extends Behavior {
  * @param \Cake\ORM\Entity $entity The entity that was saved.
  * @return void
  */
-	public function beforeDelete( Event $event, Entity $entity, $options ) {
+    public function beforeDelete(EventInterface $event, EntityInterface $entity, ArrayObject $options)
+    {
+        if (MTApp::getContext() !== 'tenant') {
+            // tenant scope does not allow global context
+            throw new DataScopeViolationException('Tenant Scoped accessed globally');
+        }
 
-		if ( MTApp::getContext() == 'tenant' ) { 
+        $field = $this->getConfig('foreign_key_field');
 
-			$field = $this->config('foreign_key_field');
-
-			//paranoid check of ownership
-			if ( $entity->{$field} != MTApp::tenant()->id ) { //current tenant is NOT owner
-				throw new DataScopeViolationException('Tenant->id:' . MTApp::tenant()->id . ' does not own '.$this->_table->alias().'->id:' . $entity->id );
-			}
-
-		} 
-
-		//skip if primary domain
-		else if(MTApp::isPrimary()){
-			return true;
-		}
-
-		// tenant scope does not allow global context
-		else {
-			throw new DataScopeViolationException('Tenant Scoped accessed globally');
-		}
-
-		return true;
-	}
-	
-
+        //paranoid check of ownership
+        if ($entity->get($field) !== MTApp::tenant()->id) {
+            //current tenant is NOT owner
+            throw new DataScopeViolationException('Tenant->id:' . MTApp::tenant()->id . ' does not own ' . $this->_table->getAlias() . '->id:' . $entity->id);
+        }
+    }
 }
