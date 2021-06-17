@@ -15,6 +15,7 @@
 namespace MultiTenant\Model\Behavior;
 
 use ArrayObject;
+use Cake\Core\Configure;
 use Cake\Datasource\EntityInterface;
 use Cake\Event\Event;
 use Cake\Event\EventInterface;
@@ -22,20 +23,21 @@ use Cake\ORM\Behavior;
 use Cake\ORM\Entity;
 use Cake\ORM\Query;
 use Cake\ORM\Table;
-use MultiTenant\Core\MTApp;
 use MultiTenant\Error\DataScopeViolationException;
 
 class GlobalScopeBehavior extends Behavior
 {
 
-/**
- * Default config
- *
- * These are merged with user-provided config when the behavior is used.
- *
- *
- * @var array
- */
+    private $__tenant;
+
+    /**
+     * Default config
+     *
+     * These are merged with user-provided config when the behavior is used.
+     *
+     *
+     * @var array
+     */
     protected $_defaultConfig = [
         'implementedFinders' => [],
         'implementedMethods' => [],
@@ -52,7 +54,8 @@ class GlobalScopeBehavior extends Behavior
  */
     public function __construct(Table $table, array $config = [])
     {
-        $config = array_merge(MTApp::getConfig('scopeBehavior'), $config);
+        $this->__tenant = Configure::read('MultiTenant.tenant');
+        $config = array_merge(Configure::read('MultiTenant.scopeBehavior'), $config);
         parent::__construct($table, $config);
     }
 
@@ -67,7 +70,7 @@ class GlobalScopeBehavior extends Behavior
      */
     public function beforeFind(EventInterface $event, Query $query, ArrayObject $options, bool $primary)
     {
-        if (MTApp::getContext() === 'tenant') {
+        if ($this->__tenant->context === 'tenant') {
             throw new DataScopeViolationException('Tenant cannot query global records');
         }
     }
@@ -84,7 +87,7 @@ class GlobalScopeBehavior extends Behavior
     public function beforeSave(EventInterface $event, EntityInterface $entity, ArrayObject $options)
     {
         //Prevent saving records in the implementing table if this is the tenant context
-        if (MTApp::getContext() === 'tenant') {
+        if ($this->__tenant->context === 'tenant') {
             throw new DataScopeViolationException('Tenant cannot save global records');
         }
     }
@@ -100,7 +103,7 @@ class GlobalScopeBehavior extends Behavior
  */
     public function beforeDelete(EventInterface $event, EntityInterface $entity, ArrayObject $options)
     {
-        if (MTApp::getContext() == 'tenant') {
+        if ($this->__tenant->context === 'tenant') {
             throw new DataScopeViolationException('Tenant cannot delete global records');
         }
     }

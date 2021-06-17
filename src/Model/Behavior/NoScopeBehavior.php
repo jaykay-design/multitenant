@@ -14,23 +14,25 @@
  */
 namespace MultiTenant\Model\Behavior;
 
+use Cake\Core\Configure;
 use Cake\Event\Event;
 use Cake\ORM\Behavior;
 use Cake\ORM\Entity;
 use Cake\ORM\Table;
-use MultiTenant\Core\MTApp;
 
 class NoScopeBehavior extends Behavior
 {
 
-/**
- * Default config
- *
- * These are merged with user-provided config when the behavior is used.
- *
- *
- * @var array
- */
+    private $__tenant;
+
+    /**
+     * Default config
+     *
+     * These are merged with user-provided config when the behavior is used.
+     *
+     *
+     * @var array
+     */
     protected $_defaultConfig = [
         'implementedFinders' => [],
         'implementedMethods' => [],
@@ -46,7 +48,8 @@ class NoScopeBehavior extends Behavior
  */
     public function __construct(Table $table, array $config = [])
     {
-        $config = array_merge(MTApp::getConfig('scopeBehavior'), $config);
+        $this->__tenant = Configure::read('MultiTenant.tenant');
+        $config = array_merge(Configure::read('MultiTenant.scopeBehavior'), $config);
         parent::__construct($table, $config);
     }
 
@@ -61,13 +64,13 @@ class NoScopeBehavior extends Behavior
  */
     public function beforeSave(Event $event, Entity $entity, $options)
     {
-        if (MTApp::getContext() !== 'tenant') {
+        if ($this->__tenant->context !== 'tenant') {
             return;
         }
 
         $field = $this->getConfig('foreign_key_field');
         if ($entity->isNew() && $entity->has($field) && $entity->get($field) === null) {
-            $entity->set($field, MTApp::tenant()->id);
+            $entity->set($field, $this->__tenant->id);
         }
     }
 }

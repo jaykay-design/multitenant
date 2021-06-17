@@ -15,16 +15,18 @@
 namespace MultiTenant\Model\Behavior;
 
 use ArrayObject;
+use Cake\Core\Configure;
 use Cake\Datasource\EntityInterface;
 use Cake\Event\EventInterface;
 use Cake\ORM\Behavior;
 use Cake\ORM\Query;
 use Cake\ORM\Table;
-use MultiTenant\Core\MTApp;
 use MultiTenant\Error\DataScopeViolationException;
 
 class TenantScopeBehavior extends Behavior
 {
+
+    private $__tenant;
 
 /**
  * Default config
@@ -49,7 +51,8 @@ class TenantScopeBehavior extends Behavior
  */
     public function __construct(Table $table, array $config = [])
     {
-        $config = array_merge(MTApp::getConfig('scopeBehavior'), $config);
+        $this->__tenant = Configure::read('MultiTenant.tenant');
+        $config = array_merge(Configure::read('MultiTenant.scopeBehavior'), $config);
         parent::__construct($table, $config);
     }
 
@@ -65,7 +68,7 @@ class TenantScopeBehavior extends Behavior
     public function beforeFind(EventInterface $event, Query $query, ArrayObject $options, bool $primary)
     {
         // if context is tenant, add conditions to query
-        if (MTApp::getContext() !== 'tenant') {
+        if ($this->__tenant->context !== 'tenant') {
             // tenant scope does not allow global context
             throw new DataScopeViolationException('Tenant Scoped accessed globally');
         }
@@ -77,10 +80,10 @@ class TenantScopeBehavior extends Behavior
 
         $alias = $this->_table->getAlias();
         // secure the configured tenant table by adding a primary key condition
-        if ($alias === MTApp::getConfig('model')['className']) {
-            $query->where([$alias . '.' . $this->_table->getPrimaryKey() => MTApp::tenant()->id]);
+        if ($alias === Configure::read('MultiTenant.model.className')) {
+            $query->where([$alias . '.' . $this->_table->getPrimaryKey() => $this->__tenant->id]);
         } else {
-            $query->where([$alias . '.' . $this->getConfig('foreign_key_field') => MTApp::tenant()->id]);
+            $query->where([$alias . '.' . $this->getConfig('foreign_key_field') => $this->__tenant->id]);
         }
     }
 
@@ -95,7 +98,7 @@ class TenantScopeBehavior extends Behavior
  */
     public function beforeSave(EventInterface $event, EntityInterface $entity, ArrayObject $options)
     {
-        if (MTApp::getContext() !== 'tenant') {
+        if ($this->__tenant->context !== 'tenant') {
             // tenant scope does not allow global context
             throw new DataScopeViolationException('Tenant Scoped accessed globally');
         }
@@ -103,12 +106,12 @@ class TenantScopeBehavior extends Behavior
         $field = $this->getConfig('foreign_key_field');
         if ($entity->isNew()) {
             //blind overwrite, preventing user from providing explicit value
-            $entity->set($field, MTApp::tenant()->id);
+            $entity->set($field, $this->__tenant->id);
         } else {
             //paranoid check of ownership
-            if ($entity->get($field) != MTApp::tenant()->id) {
+            if ($entity->get($field) != $this->__tenant->id) {
                 //current tenant is NOT owner
-                throw new DataScopeViolationException('Tenant->id: ' . MTApp::tenant()->id . ' does not own ' . $this->_table->getAlias() . '->id: ' . $entity->id);
+                throw new DataScopeViolationException('Tenant->id: ' . $this->__tenant->id . ' does not own ' . $this->_table->getAlias() . '->id: ' . $entity->id);
             }
         }
 
@@ -125,7 +128,7 @@ class TenantScopeBehavior extends Behavior
  */
     public function beforeDelete(EventInterface $event, EntityInterface $entity, ArrayObject $options)
     {
-        if (MTApp::getContext() !== 'tenant') {
+        if ($this->__tenant->context !== 'tenant') {
             // tenant scope does not allow global context
             throw new DataScopeViolationException('Tenant Scoped accessed globally');
         }
@@ -133,9 +136,9 @@ class TenantScopeBehavior extends Behavior
         $field = $this->getConfig('foreign_key_field');
 
         //paranoid check of ownership
-        if ($entity->get($field) !== MTApp::tenant()->id) {
+        if ($entity->get($field) !== $this->__tenant->id) {
             //current tenant is NOT owner
-            throw new DataScopeViolationException('Tenant->id:' . MTApp::tenant()->id . ' does not own ' . $this->_table->getAlias() . '->id:' . $entity->id);
+            throw new DataScopeViolationException('Tenant->id:' . $this->__tenant->id . ' does not own ' . $this->_table->getAlias() . '->id:' . $entity->id);
         }
     }
 }
