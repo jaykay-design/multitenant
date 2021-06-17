@@ -5,24 +5,23 @@
 	"type": "cakephp-plugin",
 	"keywords": [
 		"cakephp",
-		"cakephp3",
-		"cake3",
+		"cakephp4",
+		"cake4",
 		"plugin",
 		"cakephp-plugin",
 		"saas",
 		"multitenant",
 		"multi-tenant",
 		"subdomain",
-		"cake",
-		"pronique"
+		"cake"
 	],
-	"homepage": "https://github.com/pronique/multitenant",
+	"homepage": "https://github.com/jaykay-design/multitenant",
 	"license": "MIT",
 	"authors": [
 		{
-			"name": "Jonathan Cutrer",
+			"name": "John Caprez",
 			"role": "Author",
-			"homepage": "http://github.com/joncutrer"
+			"homepage": "https://github.com/jaykay-design"
 		}
 	],
 	"require-dev": {
@@ -31,8 +30,7 @@
 	"suggest": {},
 	"autoload": {
 		"psr-4": {
-			"MultiTenant\\": "src",
-			"MultiTenant\\Test\\": "tests"
+			"MultiTenant\\": "src"
 		}
 	},
 	"extra": {

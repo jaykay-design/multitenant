@@ -2,9 +2,11 @@
 
 MultiTenant CakePHP Plugin - Use this plugin to easily build SaaS enabled web applications.
 
+Forked from https://github.com/pronique/multitenant
+
 ## Version notice
 
-This plugin only supports CakePHP 3.x
+This plugin only supports CakePHP >= 4.x
 
 The project is currently in development and is considered experimental at this stage.
 
@@ -43,16 +45,6 @@ application. ie signup/register code.
 
 'tenant' context represents this tenant.  When the user is accessing the application at the subdomain, this is 
 considered the 'tenant' context.
-
-#### Custom Contexts
-
-The plugin supports the definition of additional contexts, these custom contexts are mapped
-to subdomains.  Your application you can now call `MTApp::getContext()` to implement context-aware
-code. 
-
-For example, create a context named 'admin' and map it to the subdomain 'admin.mydomain.com'.
-
-Note: Contexts are not a replacement for role based authorization but in some cases may be complimentary.
 
 ### Scopes
 
@@ -101,7 +93,7 @@ The recommended installation method for this plugin is by using composer. Just a
 ```json
 {
 	"require" : {
-		"pronique/multitenant": "master-dev"
+		"jaykaydesign/multitenant": "master-dev"
 	}
 }
 ```
@@ -111,15 +103,36 @@ The recommended installation method for this plugin is by using composer. Just a
 Alternatively you can just `git clone` the code into your application
 
 ```
-git clone git://github.com/pronique/multitenant.git app/Plugin/MultiTenant
+git clone git://github.com/jaykaydesign/multitenant.git app/Plugin/MultiTenant
 ```
 
+With this option you will have to update your autoload section in composer.json with
+```
+    "autoload": {
+        "psr-4": {
+			...
+            "MultiTenant\\": "./plugins/MultiTenant/src"
+			...
+        }
+    },
+```
 ### git submodule
 
 Or add it as a git module, this is recommended over `git clone` since it’s easier to keep up to date with development that way
 
 ```
-git submodule add git://github.com/pronique/multitenant.git app/Plugin/MultiTenant
+git submodule add git://github.com/jaykaydesign/multitenant.git app/Plugin/MultiTenant
+```
+
+With this option you will have to update your autoload section in composer.json with
+```
+    "autoload": {
+        "psr-4": {
+			...
+            "MultiTenant\\": "./plugins/MultiTenant/src"
+			...
+        }
+    },
 ```
 
 ## Configuration
@@ -143,91 +156,65 @@ Add the following to the bottom of your application's config\app.php
  *
  * - `strategy` - 'domain' is currently the only implemented strategy
  * - `primaryDomain` - The domain for the main application
- *    value to false, when dealing with older versions of IE, Chrome Frame or certain web-browsing devices and AJAX
+ * - `tenantDomainSuffix` - Remove this suffix from the domain to get the tenant name
  * - `model` - The model that represents the tenant, usually 'Accounts'
- * - `redirectInactive` - URI to redirect when the tenant is not active or does not exist.  This should be a uri at the
- *	  primary domain, usually your signup page or feature pitch page with call-to-action signup button.
- * - `reservedDomains` - An array of names that cannot be chosen at signup
- * - `contextMap` - Associative array used to define additional custom contexts besides 'global' and 'tenant', 
- *    i.e. when domain admin.domain.com is matched MTApp::getContext() will return the custom context 'admin'. 
- * - `ScopedBehavior` - Application wide defaults for the ScopedBehavior Behavior
- * - `MixedBehavior` - Application wide defaults for the MixedBehavior Behavior
+ * - `scopeBehavior` - Application wide defaults for the Behaviors
  *
  */
 	'MultiTenant' => [
-		'strategy'=>'domain',
-		'primaryDomain'=>'www.example.com',
-		'model'=>[
-		  'className'=>'Accounts',
-		  'field'=>'domain', //field of model that holds subdomain/domain tenants
-		  'conditions'=>['is_active'=>1] //query conditions to match active accounts
-		],
-		'redirectInactive'=>'/register',
-		'reservedDomains'=>[
-			'admin',
-			'superuser',
-			'system',
-			'www'
-		],
-		'contextMap' => [
-			'admin'=>'admin.example.com' //an example of a custom context
+		'strategy' => 'domain',
+		'primaryDomain' => 'www.example.com',
+        'tenantDomainSuffix' => '.example.com',
+		'model' => [
+		  'className'=>'Tenants',
+		  'field' => 'domain', //field of model that holds subdomain/domain tenants
+		  'conditions' => ['is_active' => 1] //query conditions to match active accounts
 		],
 		'scopeBehavior'=>[
-			'global_value'=>0, //global records are matched by this value
-			'foreign_key_field'=>'account_id' //the foreign key field that associates records to tenant model
+			'global_value' => 1, //global records are matched by this value
+			'foreign_key_field' => 'account_id' //the foreign key field that associates records to tenant model
 		]
 	]
 ```
 
 Note:  don't forget to add the , to the bottom config section when pasting the above configuration.  A syntax error in config\app.php is a silent failure (blank page). 
 
+Update your `src/application.php`
+```php
+use MultiTenant\Routing\Middleware\MultiTenantMiddleware;
+
+...
+
+    public function bootstrap(): void
+    {
+		...
+        $this->addPlugin('MultiTenant');
+		...
+	}
+```
+
+
 ## Usage
 
-### MTApp
+### Accessing the tenant
 
-`MTApp` is a static class that you can call from anywhere in your application.
-
+The current tenant is store dint he application configuration.
 ```php
-use MultiTenant\Core\MTApp;
-
 //Returns an entity of the current tenant
-$tenant = MTApp::tenant();
+$tenant = Configure::read('MultiTenant.tenant');
 echo $tenant->id;
 //output 1
 
 //Or the same thing in a single line;
-echo MTApp::tenant()->id;
+echo Configure::read('MultiTenant.tenant')->id;
 //output 1
 
 //Another Example, you can reference any field in the underlying model
-echo MTApp::tenant()->name;
+echo Configure::read('MultiTenant.tenant')->name;
 //output Acme Corp.
 ```
 
-```php
-use MultiTenant\Core\MTApp;
 
-// Based on URL, we are in a tenant's sudomain, customera.example.com
-echo MTApp::getContext();
-//output 'tenant'
-
-// Based on URL, we are in at the primary sudomain www.example.com
-echo MTApp::getContext();
-//output 'global'
-
-// Assumming we have defined a custom context, we are in at the sudomain admin.example.com
-echo MTApp::getContext();
-//output 'admin'
-
-var_dump( MTApp::isPrimary() );
-//returns true if we are at the primaryDomain, false if we are at a tenant's subdomain or in a custom context.
-```
-
-You can omit the `use MultiTenant\Core\MTApp;` line by calling the class with full namespace
-
-```php
-\MultiTenant\Core\MTApp::tenant();
-```
 ### Behavior usage examples
 
 #### TenantScopeBehavior
