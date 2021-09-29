@@ -3,8 +3,9 @@ declare (strict_types = 1);
 
 namespace MultiTenant\Routing\Middleware;
 
+use Cake\Cache\Cache;
 use Cake\Core\Configure;
-use Cake\Http\Response;
+use Cake\Core\InstanceConfigTrait;
 use Cake\ORM\TableRegistry;
 use Exception;
 use Psr\Http\Message\ResponseInterface;
@@ -19,7 +20,11 @@ use Psr\Http\Server\RequestHandlerInterface;
  */
 class MultiTenantMiddleware implements MiddlewareInterface
 {
-    private static $__cachedAccounts = [];
+    use InstanceConfigTrait;
+
+    protected $_defaultConfig = [
+        'cacheProfile' => 'default',
+    ];
 
     /**
      *
@@ -29,6 +34,7 @@ class MultiTenantMiddleware implements MiddlewareInterface
      */
     public function __construct(array $options = [])
     {
+        $this->setConfig($options);
     }
 
     /**
@@ -42,7 +48,7 @@ class MultiTenantMiddleware implements MiddlewareInterface
     {
         $host = $request->getUri()->getHost();
 
-        $tenant = self::__findTenant($host);
+        $tenant = $this->__findTenant($host);
 
         if ($tenant === null) {
             throw new Exception('Missing tenant');
@@ -53,14 +59,15 @@ class MultiTenantMiddleware implements MiddlewareInterface
         return $handler->handle($request);
     }
 
-    private static function __findTenant(string $host)
+    private function __findTenant(string $host)
     {
         //get tenant qualifier
         $qualifier = self::__getTenantQualifier($host);
 
         //Read entity from cache if it exists
-        if (array_key_exists($qualifier, self::$__cachedAccounts)) {
-            return self::$__cachedAccounts[$qualifier];
+        $tenant = Cache::read('MultiTenant.tenants.' . $qualifier, $this->getConfig('cacheProfile'));
+        if ($tenant !== null) {
+            return $tenant;
         }
 
         //load model
@@ -74,7 +81,9 @@ class MultiTenantMiddleware implements MiddlewareInterface
             ->where($conditions)
             ->first();
 
-        self::$__cachedAccounts[$qualifier] = $tenant;
+        if ($tenant != null) {
+            Cache::write('MultiTenant.tenants.' . $qualifier, $tenant, $this->getConfig('cacheProfile'));
+        }
 
         return $tenant;
     }
