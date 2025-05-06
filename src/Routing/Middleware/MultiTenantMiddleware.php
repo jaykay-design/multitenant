@@ -1,5 +1,6 @@
 <?php
-declare (strict_types = 1);
+
+declare(strict_types=1);
 
 namespace MultiTenant\Routing\Middleware;
 
@@ -51,7 +52,11 @@ class MultiTenantMiddleware implements MiddlewareInterface
         $tenant = $this->__findTenant($host);
 
         if ($tenant === null) {
-            throw new Exception('Missing tenant');
+            if ($defaultTenant = Configure::read('MultiTenant.defaultTenant')) {
+                $tenant = $this->__findTenant($defaultTenant);
+            } else {
+                throw new Exception('Missing tenant');
+            }
         }
 
         Configure::write('MultiTenant.tenant', $tenant);
@@ -101,5 +106,4 @@ class MultiTenantMiddleware implements MiddlewareInterface
 
         throw new Exception('Missing tenant detection stategy');
     }
-
 }
