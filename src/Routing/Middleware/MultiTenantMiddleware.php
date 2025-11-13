@@ -55,6 +55,7 @@ class MultiTenantMiddleware implements MiddlewareInterface
             Configure::write('MultiTenant.tenant', $tenant);
         } elseif ($defaultTenant = Configure::read('MultiTenant.defaultTenant')) {
             $tenant = $this->__findTenant($defaultTenant);
+            Configure::write('MultiTenant.tenant', $tenant);
         } else {
             throw new Exception('Missing tenant');
         }
