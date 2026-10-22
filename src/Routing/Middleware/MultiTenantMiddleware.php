@@ -9,6 +9,7 @@ use Cake\Core\Configure;
 use Cake\Core\InstanceConfigTrait;
 use Cake\ORM\TableRegistry;
 use Exception;
+use MultiTenant\Error\MissingTenantException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -57,7 +58,7 @@ class MultiTenantMiddleware implements MiddlewareInterface
             $tenant = $this->__findTenant($defaultTenant);
             Configure::write('MultiTenant.tenant', $tenant);
         } else {
-            throw new Exception('Missing tenant');
+            throw new MissingTenantException();
         }
 
         return $handler->handle($request);
